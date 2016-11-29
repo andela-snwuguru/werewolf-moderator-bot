@@ -1,3 +1,5 @@
+var DEFAULT_CHANNEL = "C2RF9N334";
+
 var utils = {
     getCommandList: function () {
       return {
@@ -52,8 +54,23 @@ var utils = {
       robot.brain.data.games[village.id] = {players: {}, gameOn: true, locked: false};
       return true;
     },
-    endGame: function(village, res){
+    endGame: function(robot, village, res, force){
+      if(village.owner_id !== res.message.user.id){
+          res.send("You are not permitted to end this game. Contact " + village.owner);
+          return;
+      }
 
+      if(force){
+        robot.messageRoom(DEFAULT_CHANNEL, "@here " + village.owner + " has terminated the ongoing game in " + village.name + " village :sad-fb:");
+      }else{
+        this.showGameResult(robot, village);
+      }
+
+      robot.brain.data.games[village.id].gameOn = false;
+      robot.brain.data.games[village.id].players = {};
+    },
+    showGameResult: function(robot, village){
+      robot.messageRoom(DEFAULT_CHANNEL, "@here The nightmail in " + village.name + " village has ended, the wolves have been totally eliminated by the bravery of all the villagers.");
     },
     villageGate: function(robot, villages, village, status, res){
       if(villages[village.id] === undefined){

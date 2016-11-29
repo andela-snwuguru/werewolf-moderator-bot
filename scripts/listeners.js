@@ -86,7 +86,6 @@ function bot(robot) {
         utils.villageGate(robot, villages, village, true, res);
     });
 
-
     robot.respond(/open gate (.*)/i, function (res) {
         var village = {
             name: res.match[1], 
@@ -97,20 +96,24 @@ function bot(robot) {
         utils.villageGate(robot, villages, village, false, res);
     });
 
-    //Start Game
-    robot.respond(/new gamey/i, function (res) {
-        var hashids = new Hashids();
-        var random_int = Date.now();
-        // var gameId = hashids.encode(random_int);
-        var gameId = DEFAULT_GAMEID;
+    robot.respond(/end game (.*)/i, function (res) {
+        var village = {
+            name: res.match[1], 
+            id:res.match[1].replace(" ", "_"), 
+            owner_id: res.message.user.id,
+            owner: res.message.user.name
+        };
 
-        if(robot.brain.data.games == null) {
-            robot.brain.data.games = {};
+        if(villages[village.id] === undefined){
+            res.send(village.name + " is not on the map :shrug:");
+            return;
+        }else{
+            village = villages[village.id];
         }
-        robot.brain.data.games[gameId] = {players: [], status: "on"};
 
-        robot.emit("join", gameId);
+        utils.endGame(robot, village, res, true);
     });
+
 
     robot.on("join", function(gameId) {
         robot.messageRoom(DEFAULT_CHANNEL, "@here New wolf game starting! To join, DM me with the command: `join` In 2 minutes, registration will be over!");
