@@ -54,7 +54,8 @@ var utils = {
       }
 
       robot.brain.data.games[village.id] = {
-        players: {}, 
+        players: {},
+        playerIds: [],
         gameOn: true,
         registration: true,
         locked: false, 
@@ -83,6 +84,7 @@ var utils = {
       }else{
         //player['role'] = this.getRole(village);
         robot.brain.data.games[village.id].players[player.id] = player;
+        robot.brain.data.games[village.id].playerIds.push(player.id);
         robot.brain.data.games[village.id].total += 1;
         res.send("Welcome to " + village.name + " village, your safty is in your hands :shrug:. I'm waiting for other players to join so I can assign your role!");
       }

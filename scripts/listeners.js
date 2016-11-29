@@ -42,6 +42,7 @@ function bot(robot) {
         if(utils.gameExists(robot, village.id)){
             if(robot.brain.data.games[village.id].registration){
                 utils.addPlayer(robot, village, res);
+                console.log("joined: ", res.message.user.name);
             }else{
                 if(robot.brain.data.games[village.id].locked){
                     res.send("You are late to the party, ask " + village.owner + " to open the gate for you.");
@@ -143,22 +144,22 @@ function bot(robot) {
     });
 
     robot.on("assign roles", function(village) {
-        console.log("assign roles");
+        console.log("assigning roles");
         //send DMs, inform channel of number of players, wolves, healers. etc
-        var gameId = DEFAULT_GAMEID;
-        generateRoleIndexesAndAssign(robot);
-        var ids = robot.brain.data.games[gameId].wolfIds;
-        if(ids.length > 1){
-            createMultiParty(ids, function(multiDM) {
+        var gameId = village.id;
+        generateRoleIndexesAndAssign(robot, village.id);
+        var wolfIds = robot.brain.data.games[gameId].wolfIds;
+        if(wolfIds.length > 1){
+            createMultiParty(wolfIds, function(multiDM) {
                 console.log("WOLVES DM IS", multiDM);
                 robot.brain.data.games[gameId].WOLVES_DM = multiDM;
-                robot.emit("village sleep");
+                //robot.emit("village sleep");
             });
         }
         else {
-            var wolfId = robot.brain.data.games[gameId].players[wolfIds[0]].id;
+            var wolfId = robot.brain.data.games[gameId].playerIds[wolfIds[0]];
             robot.brain.data.games[gameId].WOLVES_DM = wolfId;
-            robot.emit("village sleep");
+            //robot.emit("village sleep");
         }
         console.log("players", robot.brain.data.games[gameId].players);
     });
@@ -441,38 +442,34 @@ function notifyPlayerOfRole(robot, slackId, role) {
 }
 
 //refactor to modify player roles in place
-function assignRolesAndNotifyPlayers(robot, wolfIndexes, healerIndex, seekerIndex) {
-
-    var gameId = DEFAULT_GAMEID;
-    var players = robot.brain.data.games[gameId].players;
-
+function assignRolesAndNotifyPlayers(robot, gameId, wolfIndexes, healerIndex, seekerIndex) {
+    var players = robot.brain.data.games[gameId].playerIds;
     console.log("assignRolesAndNotifyPlayers", players);
 
     for(var playerIndex in players) {
         var intPlayerIndex = Number(playerIndex); // because for in keys are strings
-        players[intPlayerIndex].role = PLAYER_ROLES.villager;
+        robot.brain.data.games[gameId].players[players[intPlayerIndex]].role = PLAYER_ROLES.villager;
         
         if(wolfIndexes.indexOf(intPlayerIndex) > -1) {
-            players[intPlayerIndex].role = PLAYER_ROLES.wolf;
-            notifyPlayerOfRole(robot, players[intPlayerIndex].id, PLAYER_ROLES.wolf);
+            robot.brain.data.games[gameId].players[players[intPlayerIndex]].role = PLAYER_ROLES.wolf;
+            notifyPlayerOfRole(robot, players[intPlayerIndex], PLAYER_ROLES.wolf);
         }
         else if(intPlayerIndex === healerIndex) {
-            players[intPlayerIndex].role = PLAYER_ROLES.healer;
-            notifyPlayerOfRole(robot, players[intPlayerIndex].id, PLAYER_ROLES.healer);
+            robot.brain.data.games[gameId].players[players[intPlayerIndex]].role = PLAYER_ROLES.healer;
+            notifyPlayerOfRole(robot, players[intPlayerIndex], PLAYER_ROLES.healer);
         }
         else if(intPlayerIndex === seekerIndex) {
-            players[intPlayerIndex].role = PLAYER_ROLES.seeker;
-            notifyPlayerOfRole(robot, players[intPlayerIndex].id, PLAYER_ROLES.seeker);
+            robot.brain.data.games[gameId].players[players[intPlayerIndex]].role = PLAYER_ROLES.seeker;
+            notifyPlayerOfRole(robot, players[intPlayerIndex], PLAYER_ROLES.seeker);
         }
         else {
-            notifyPlayerOfRole(robot, players[intPlayerIndex].id, PLAYER_ROLES.villager);
+            notifyPlayerOfRole(robot, players[intPlayerIndex], PLAYER_ROLES.villager);
         }
     }
 }
 
-function generateRoleIndexesAndAssign(robot) {
-    var gameId = DEFAULT_GAMEID;
-    var players = robot.brain.data.games[gameId].players;
+function generateRoleIndexesAndAssign(robot, gameId) {
+    var players = robot.brain.data.games[gameId].playerIds;
     var numPlayers = players.length;
     var numWolves = Math.floor(0.3 * numPlayers);
 
@@ -480,14 +477,13 @@ function generateRoleIndexesAndAssign(robot) {
     var healerIndex = generateHealerIndex(wolfIndexes, numPlayers);
     var seekerIndex = generateSeekerIndex(wolfIndexes, healerIndex, numPlayers);
 
-    assignRolesAndNotifyPlayers(robot, wolfIndexes, healerIndex, seekerIndex);
+    assignRolesAndNotifyPlayers(robot, gameId, wolfIndexes, healerIndex, seekerIndex);
     robot.brain.data.games[gameId].wolfIndexes = wolfIndexes;
     robot.brain.data.games[gameId].healerIndex = healerIndex;
     robot.brain.data.games[gameId].seekerIndex = seekerIndex;
+    robot.brain.data.games[gameId].HEALER_DM = players[healerIndex];
+    robot.brain.data.games[gameId].SEEKER_DM = players[seekerIndex];
     robot.brain.data.games[gameId].wolfIds = getWolfIds(robot, players, wolfIndexes);
-    setUpHealerDM(robot, players, healerIndex);
-    setUpSeekerDM(robot, players, seekerIndex);
-
 }
 
 function createMultiParty(slackIds, cb) {
@@ -511,32 +507,19 @@ function createMultiParty(slackIds, cb) {
 }
 
 function getWolfIds(robot, players, wolfIndexes) {
-    var gameId = DEFAULT_GAMEID;
     var ids = [];
     for (var i in wolfIndexes) {
         console.log("setting up wolves DM", wolfIndexes, wolfIndexes[i], players, players[wolfIndexes[i]], players[wolfIndexes[i]].id);
-        ids.push(players[wolfIndexes[i]].id);
+        ids.push(players[wolfIndexes[i]]);
     }
     return ids;
 }
 
-function setUpWolvesDM(robot, players, wolfIndexes) {
+function setUpWolvesDM(robot, gameId, ids) {
     createMultiParty(ids, function(multiDM) {
         console.log("WOLVES DM IS", multiDM);
         robot.brain.data.games[gameId].WOLVES_DM = multiDM;
     });
-}
-
-function setUpHealerDM(robot, players, healerIndex) {
-    var gameId = DEFAULT_GAMEID;
-    var healerId = players[healerIndex].id;
-    robot.brain.data.games[gameId].HEALER_DM = healerId;
-}
-
-function setUpSeekerDM(robot, players, seekerIndex) {
-    var gameId = DEFAULT_GAMEID;
-    var seekerId = players[seekerIndex].id;
-    robot.brain.data.games[gameId].SEEKER_DM = seekerId;
 }
 
 
