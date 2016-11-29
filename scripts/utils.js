@@ -51,6 +51,27 @@ var utils = {
 
       robot.brain.data.games[village.id] = {players: {}, gameOn: true, locked: false};
       return true;
+    },
+    endGame: function(village, res){
+
+    },
+    villageGate: function(robot, villages, village, status, res){
+      if(villages[village.id] === undefined){
+          res.send(village.name + " is not on the map :shrug:");
+          return;
+      }
+
+      if(villages[village.id].owner_id !== village.owner_id){
+          res.send("You are not permitted to lock the gate. Contact " + villages[village.id].owner);
+          return;
+      }
+      robot.brain.data.games[village.id].locked = status;
+      if(status){
+        res.send("Entrance gate to " + villages[village.id].name + " has been locked");
+      }else{
+        res.send("Entrance gate to " + villages[village.id].name + " has been opened");
+      }
+      
     }
 };
 

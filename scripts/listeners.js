@@ -43,7 +43,7 @@ function bot(robot) {
             //robot.brain.data.games[village.id].players.push();
             res.send("Welcome to " + village.name);
         }else{
-            res.send("No existing village called " + village.name + ", you can create your own village with the following command "+ utils.getCommandList['newGame']);
+            res.send("No existing village called " + village.name + ", you can create your own village with the following command "+ utils.getCommandList()['newGame']);
         }
         /*var name = res.message.user.name;
         var id = res.message.user.id;
@@ -76,6 +76,26 @@ function bot(robot) {
         }
     });
 
+    robot.respond(/lock gate (.*)/i, function (res) {
+        var village = {
+            name: res.match[1], 
+            id:res.match[1].replace(" ", "_"), 
+            owner_id: res.message.user.id,
+            owner: res.message.user.name
+        };
+        utils.villageGate(robot, villages, village, true, res);
+    });
+
+
+    robot.respond(/open gate (.*)/i, function (res) {
+        var village = {
+            name: res.match[1], 
+            id:res.match[1].replace(" ", "_"), 
+            owner_id: res.message.user.id,
+            owner: res.message.user.name
+        };
+        utils.villageGate(robot, villages, village, false, res);
+    });
 
     //Start Game
     robot.respond(/new gamey/i, function (res) {
