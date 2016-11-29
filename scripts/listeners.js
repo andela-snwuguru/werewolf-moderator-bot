@@ -13,6 +13,7 @@ var mock_data = require('./stubs.js');
 var moment    = require('moment');
 var NRP       = require('node-redis-pubsub');
 var request   = require('request');
+var utils   = require('./utils.js');
 
 
 // set globals
@@ -22,6 +23,7 @@ var PLAYER_HEALTH = {alive: "alive", dead: "dead"};
 var DEFAULT_CHANNEL = "C2RF9N334";
 var DEFAULT_TIMEOUT = 10000;
 var DEFAULT_GAMEID = "WOLFEY";
+var villages = {};
 
 
 //bot listeners
@@ -32,8 +34,51 @@ function bot(robot) {
         res.send("brain deleted");
     });
 
+    robot.respond(/join (.*)/i, function (res) {
+        var village = {
+            name: res.match[1],
+            id:res.match[1].replace(" ", "_"), 
+        };
+        if(utils.gameExists(robot, village.id)){
+            //robot.brain.data.games[village.id].players.push();
+            res.send("Welcome to " + village.name);
+        }else{
+            res.send("No existing village called " + village.name + ", you can create your own village with the following command "+ utils.getCommandList['newGame']);
+        }
+        /*var name = res.message.user.name;
+        var id = res.message.user.id;
+        var newPlayer = {name: name, id: id, health: PLAYER_HEALTH.alive};
+        robot.brain.data.games[gameId].players.push(newPlayer);
+
+        //TODO thank player for joining
+        res.send('Thanks @' + name + " for joining! I'm waiting for other players to join so I can assign your role!");
+        */
+        
+    });
+
+    robot.respond(/new game (.*)/i, function (res) {
+        var village = {
+            name: res.match[1], 
+            id:res.match[1].replace(" ", "_"), 
+            owner_id: res.message.user.id,
+            owner: res.message.user.name
+        };
+
+        if(villages[village.id] === undefined){
+            villages[village.id] = village;
+        }else{
+            village = villages[village.id];
+        }
+
+        if(utils.newGame(robot, village, res)){
+            res.send(village.name + " has been created");
+            //robot.emit("join", gameId);
+        }
+    });
+
+
     //Start Game
-    robot.respond(/new game/i, function (res) {
+    robot.respond(/new gamey/i, function (res) {
         var hashids = new Hashids();
         var random_int = Date.now();
         // var gameId = hashids.encode(random_int);
