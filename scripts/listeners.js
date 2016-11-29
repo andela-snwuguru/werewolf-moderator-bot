@@ -21,7 +21,7 @@ var CHANNEL_ID;
 var PLAYER_ROLES = {wolf: "wolf", healer: "healer", seeker: "seeker", villager: "villager"};
 var PLAYER_HEALTH = {alive: "alive", dead: "dead"};
 var DEFAULT_CHANNEL = "C2RF9N334";
-var DEFAULT_TIMEOUT = 10000;
+var DEFAULT_TIMEOUT = 60000;
 var DEFAULT_GAMEID = "WOLFEY";
 var villages = {};
 
@@ -36,23 +36,23 @@ function bot(robot) {
 
     robot.respond(/join (.*)/i, function (res) {
         var village = {
-            name: res.match[1],
+            name: res.match[1], 
             id:res.match[1].replace(" ", "_"), 
         };
         if(utils.gameExists(robot, village.id)){
-            //robot.brain.data.games[village.id].players.push();
-            res.send("Welcome to " + village.name);
+            if(robot.brain.data.games[village.id].registration){
+                utils.addPlayer(robot, village, res);
+            }else{
+                if(robot.brain.data.games[village.id].locked){
+                    res.send("You are late to the party, ask " + village.owner + " to open the gate for you.");
+                    return;
+                }
+                utils.addPlayerWithRole(robot, village, res);
+            }
+            
         }else{
             res.send("No existing village called " + village.name + ", you can create your own village with the following command "+ utils.getCommandList()['newGame']);
         }
-        /*var name = res.message.user.name;
-        var id = res.message.user.id;
-        var newPlayer = {name: name, id: id, health: PLAYER_HEALTH.alive};
-        robot.brain.data.games[gameId].players.push(newPlayer);
-
-        //TODO thank player for joining
-        res.send('Thanks @' + name + " for joining! I'm waiting for other players to join so I can assign your role!");
-        */
         
     });
 
@@ -72,7 +72,7 @@ function bot(robot) {
 
         if(utils.newGame(robot, village, res)){
             res.send(village.name + " has been created");
-            //robot.emit("join", gameId);
+            robot.emit("broadcast join", village);
         }
     });
 
@@ -115,24 +115,19 @@ function bot(robot) {
     });
 
 
-    robot.on("join", function(gameId) {
-        robot.messageRoom(DEFAULT_CHANNEL, "@here New wolf game starting! To join, DM me with the command: `join` In 2 minutes, registration will be over!");
-        
+    robot.on("broadcast join", function(village) {
+        robot.messageRoom(
+            DEFAULT_CHANNEL, 
+            "@here New wolf game starting! in " + village.name + " village To join, DM me with the command: " 
+            + utils.getCommandList()['join'] + " In " + (DEFAULT_TIMEOUT/(1000 * 60)) + 
+            " minutes, registration will be over!"
+        );
+        var gameId = village.id;
         robot.brain.data.games[gameId].currentHealedPlayer = "";
         robot.brain.data.games[gameId].WOLVES_DM = "";
         robot.brain.data.games[gameId].HEALER_DM = "";
         robot.brain.data.games[gameId].SEEKER_DM = "";
         robot.brain.data.games[gameId].wolfIds = [];
-
-        robot.respond(/join/i, function (res) {
-            var name = res.message.user.name;
-            var id = res.message.user.id;
-            var newPlayer = {name: name, id: id, health: PLAYER_HEALTH.alive};
-            robot.brain.data.games[gameId].players.push(newPlayer);
-
-            //TODO thank player for joining
-            res.send('Thanks @' + name + " for joining! I'm waiting for other players to join so I can assign your role!");
-        });
 
         setTimeout(function() {
             //TODO block users from joining a game in session
@@ -140,12 +135,14 @@ function bot(robot) {
             console.log("time out to join");
             robot.messageRoom(DEFAULT_CHANNEL, "@here Registration is now over! Sending you all DMs with your new roles ;)");
             console.log("players", robot.brain.data.games[gameId].players);
-            robot.emit("assign roles");
+            robot.brain.data.games[gameId].registration = false;
+            robot.brain.data.games[gameId].locked = true;
+            robot.emit("assign roles", village);
             return true;
-        }, 20000);
+        }, DEFAULT_TIMEOUT);
     });
 
-    robot.on("assign roles", function() {
+    robot.on("assign roles", function(village) {
         console.log("assign roles");
         //send DMs, inform channel of number of players, wolves, healers. etc
         var gameId = DEFAULT_GAMEID;

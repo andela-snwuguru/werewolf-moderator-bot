@@ -1,4 +1,6 @@
 var DEFAULT_CHANNEL = "C2RF9N334";
+var PLAYER_ROLES = {wolf: "wolf", healer: "healer", seeker: "seeker", villager: "villager"};
+var roles = ['wolf', 'healer', 'seeker', 'villager'];
 
 var utils = {
     getCommandList: function () {
@@ -51,8 +53,66 @@ var utils = {
         }
       }
 
-      robot.brain.data.games[village.id] = {players: {}, gameOn: true, locked: false};
+      robot.brain.data.games[village.id] = {
+        players: {}, 
+        gameOn: true,
+        registration: true,
+        locked: false, 
+        total: 0, count:{
+          wolf: 0,
+          villager: 0,
+          seeker: 0,
+          healer: 0
+        }};
       return true;
+    },
+    addPlayer: function(robot, village, res){
+      var player = {
+        name: res.message.user.name,
+        id: res.message.user.id,
+        alive: true,
+      };
+      if(robot.brain.data.games[village.id].players[player.id] !== undefined){
+        if(robot.brain.data.games[village.id].players[player.id].alive){
+          res.send("You're already a member of " + village.name + " village");
+          return;
+        }else{
+          res.send(village.name + " is not a land of the dead :mooning:");
+          return;
+        }
+      }else{
+        //player['role'] = this.getRole(village);
+        robot.brain.data.games[village.id].players[player.id] = player;
+        robot.brain.data.games[village.id].total += 1;
+        res.send("Welcome to " + village.name + " village, your safty is in your hands :shrug:. I'm waiting for other players to join so I can assign your role!");
+      }
+    },
+    addPlayerWithRole: function(robot, village, res){
+      var player = {
+        name: res.message.user.name,
+        id: res.message.user.id,
+        alive: true,
+      };
+      if(robot.brain.data.games[village.id].players[player.id] !== undefined){
+        if(robot.brain.data.games[village.id].players[player.id].alive){
+          res.send("You're already a member of " + village.name + " village");
+          return;
+        }else{
+          res.send(village.name + " is not a land of the dead :mooning:");
+          return;
+        }
+      }else{
+        player['role'] = this.getRole(village);
+        robot.brain.data.games[village.id].players[player.id] = player;
+        robot.brain.data.games[village.id].total += 1;
+        robot.brain.data.games[village.id].count[player['role']] += 1;
+        res.send("Welcome to " + village.name + " village, your safty is in your hands :shrug:. Your role is " + player['role']);
+      }
+    },
+    getRole: function(village) {
+      var game = robot.brain.data.games[village.id];
+      return PLAYER_ROLES.villager;
+      //if(game.count.total < )
     },
     endGame: function(robot, village, res, force){
       if(village.owner_id !== res.message.user.id){
